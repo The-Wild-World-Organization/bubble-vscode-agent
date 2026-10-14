@@ -1502,10 +1502,14 @@ suite('Bubble Chat', () => {
 		});
 		assert.strictEqual(log.findAll('li').length, 2);
 		const texts = () => log.findAll('span').map(node => node.textContent);
-		assert.ok(texts().some(text => text.includes('Projektweit gesucht: "x"')));
-		assert.ok(texts().some(text => text.includes('Dateibereich wird gelesen: src/example.ts')));
-		assert.ok(texts().includes('läuft'));
-		assert.ok(texts().includes('abgeschlossen'));
+		assert.ok(texts().some(text => text === 'Suche „x“'));
+		assert.ok(texts().some(text => text === 'Bereich wird gelesen · example.ts'));
+		// Ein Statussymbol je Schritt (Status als zugänglicher Name), kein zusätzlicher Chip.
+		const symbolLabels = log.findAll('span')
+			.filter(node => node.className === 'activity-symbol')
+			.map(node => node.getAttribute('aria-label'));
+		assert.deepStrictEqual(symbolLabels, ['abgeschlossen', 'läuft']);
+		assert.ok(!log.findAll('span').some(node => node.className === 'activity-status'));
 		// Keine zusätzliche Schrittnummer vor dem Titel (die Liste nummeriert selbst).
 		assert.ok(!texts().some(text => /^[✓…✗!↷] \d+\./.test(text)));
 		assert.ok(log.findAll('div').some(node =>
@@ -1554,37 +1558,124 @@ suite('Bubble Chat', () => {
 		));
 		assert.ok(spans.some(node =>
 			node.className === 'activity-title'
-			&& node.textContent.startsWith('Dateibereich wegen Budget nicht übernommen')
-			&& node.getAttribute('title') === node.textContent
+			&& node.textContent === 'Bereich nicht übernommen · example.ts · Budget'
+			&& node.getAttribute('title')
+				=== 'Dateibereich wegen Budget nicht übernommen: src/example.ts (Zeilen 1-120 angefragt)'
+		));
+		// Warnungen bleiben auch zugeklappt sichtbar (hier: Schritt aufgeklappt, Note per CSS verdeckt).
+		assert.ok(log.findAll('div').some(node =>
+			node.className === 'activity-note'
+			&& node.textContent.startsWith('Ergebnis überschreitet das Anfragebudget')
 		));
 		assert.ok(!rendered.includes('Dateiinhalt'));
 	});
 
-	test('Timeline: kompakter Aktivitätenkopf zählt nur beobachtete Aufrufe', () => {
-		const { log, sendState } = renderWebview(getChatHtml('counts'), async () => {});
+	test('Timeline: kompakter Kopf, Technik nur in geschlossenen Bereichen', () => {
+		const { log, sendState } = renderWebview(getChatHtml('compact-head'), async () => {});
 		const view = (activity: ToolActivity) => describeActivity({ round: 1, maxRounds: 8, ...activity });
+		const run = (activities: ToolActivity[], busy = false) => sendState({
+			entries: [{ kind: 'user', text: 'Frage' }],
+			activities: activities.map(view),
+			busy,
+			status: ''
+		});
+		const head = () => log.findAll('h2').map(node => node.textContent);
+
+		run([{ step: 1, tool: 'list_directory', target: '.', status: 'success' }]);
+		assert.deepStrictEqual(head(), ['1 Schritt · abgeschlossen']);
+		const rowTexts = () => log.findAll('span')
+			.filter(node => node.className === 'activity-title')
+			.map(node => node.textContent);
+		assert.deepStrictEqual(rowTexts(), ['Ordner aufgelistet · .']);
+		// Keine Statuschips, kein Aktivitätsverlauf-Titel, keine Zählerzeile.
+		assert.ok(!log.findAll('span').some(node => node.className === 'activity-status'));
+		assert.ok(!log.findAll('div').some(node => node.className === 'activity-counts'));
+		// Modellschritte stehen nur im geschlossenen Bereich "Technische Details".
+		const runTech = log.findAll('details').filter(d => d.className === 'activity-run-tech');
+		assert.strictEqual(runTech.length, 1);
+		assert.strictEqual(runTech[0].open, false);
+		assert.strictEqual(runTech[0].findAll('summary')[0].textContent, 'Technische Details');
+		assert.ok(runTech[0].findAll('div').some(node => node.textContent === 'Modellschritte: 1 von 8'));
+
+		run([
+			{ step: 1, tool: 'search_text', target: '"x" in **/*', status: 'success' },
+			{ step: 2, tool: 'read_file', target: 'src/a.ts', status: 'success' },
+			{ step: 3, tool: 'read_file', target: 'b.ts', status: 'budget-rejected' },
+			{ step: 4, tool: 'read_file', target: 'c.ts', status: 'failed' }
+		]);
+		assert.deepStrictEqual(head(), ['4 Schritte · 2 erfolgreich · 1 Budget · 1 fehlgeschlagen']);
+
+		run([{ step: 1, tool: 'read_file_range', target: 'src/a.ts', status: 'running',
+			requestedRange: { firstLine: 40, lastLine: 95 } }], true);
+		assert.deepStrictEqual(head(), ['1 Schritt · läuft']);
+		assert.deepStrictEqual(rowTexts(), ['Bereich wird gelesen · a.ts · Zeilen 40–95']);
+	});
+
+	test('Schrittzeile: Aktion, Ziel, Ergebnis; Eingabe, Ausgabe, Technik im Aufklappen', () => {
+		const { log, sendState } = renderWebview(getChatHtml('step-detail'), async () => {});
 		sendState({
 			entries: [{ kind: 'user', text: 'Frage' }],
-			activities: [
-				view({ step: 1, tool: 'search_text', target: '"x" in **/*', status: 'success' }),
-				view({ step: 2, tool: 'read_file', target: 'a.ts', status: 'success' }),
-				view({ step: 3, tool: 'read_file', target: 'b.ts', status: 'budget-rejected' }),
-				view({ step: 4, tool: 'read_file', target: 'c.ts', status: 'failed' })
-			],
+			activities: [describeActivity({
+				step: 2,
+				round: 2,
+				maxRounds: 8,
+				tool: 'read_file_range',
+				target: 'src/chat/budget.ts',
+				status: 'success',
+				requestedRange: { firstLine: 40, lastLine: 120 },
+				deliveredRange: { firstLine: 40, lastLine: 95 },
+				requestBytesAdded: 1200,
+				hypotheticalRequestBytes: 9000
+			})],
 			busy: false,
 			status: ''
 		});
-		const counts = log.findAll('div').find(node => node.className === 'activity-counts');
-		assert.strictEqual(
-			counts?.textContent,
-			'4 Aufrufe · 2 erfolgreich · 1 Budget · 1 fehlgeschlagen'
-		);
-		const rounds = log.findAll('div').find(node => node.className === 'activity-summary');
-		assert.strictEqual(rounds?.textContent, 'Modellschritte: 1 von 8');
-		assert.ok(rounds?.getAttribute('title')?.includes('nicht einzelne Aufrufe'));
+		const title = log.findAll('span').find(node => node.className === 'activity-title');
+		assert.strictEqual(title?.textContent, 'Bereich gelesen · budget.ts · Zeilen 40–95');
+		const step = log.findAll('details').find(d => d.getAttribute('data-step') === '2')!;
+		assert.strictEqual(step.open, false);
+		const blocks = step.children.filter(c => c.className === 'activity-block-title').map(c => c.textContent);
+		assert.deepStrictEqual(blocks, ['Eingabe', 'Ausgabe']);
+		const texts = step.findAll('div').map(node => node.textContent);
+		assert.ok(texts.includes('Ziel: src/chat/budget.ts'));
+		assert.ok(texts.includes('Angefordert: Zeilen 40-120'));
+		assert.ok(texts.includes('Geliefert: Zeilen 40-95'));
+		const tech = step.findAll('details').find(d => d.className === 'activity-tech')!;
+		assert.strictEqual(tech.open, false);
+		const techTexts = tech.findAll('div').map(node => node.textContent);
+		assert.ok(techTexts.some(text => text.startsWith('Modellschritt 2 von 8')));
+		assert.ok(techTexts.some(text => text.startsWith('Zusätzliche Request-Bytes: 1200')));
+		assert.ok(!techTexts.some(text => text.startsWith('Status:') || text.startsWith('Geliefert:')));
 	});
 
-	test('Ergebniskarte: Ausgang aus der Zusammenfassung, sonst nur Zähler', () => {
+	test('Ergebnis entdoppelt: einfacher Erfolg zeigt weder Badge noch Zusammenfassung', () => {
+		const { log, sendState } = renderWebview(getChatHtml('dedupe'), async () => {});
+		sendState({
+			entries: [
+				{ kind: 'user', text: 'Frage' },
+				{ kind: 'answer', text: 'Im Hauptverzeichnis befinden sich 18 Dateien und 7 Ordner.' },
+				{
+					kind: 'summary',
+					text: 'Zusammenfassung: erfolgreich\nAusgeführt (1):\n- Ordner aufgelistet: .\n'
+						+ 'Offen:\n- Es wurde keine Datei oder kein Dateibereich gelesen.\n'
+						+ 'Bubble hat keine Dateien geändert (nur lesender Zugriff).'
+				}
+			],
+			activities: [describeActivity({ step: 1, tool: 'list_directory', target: '.', status: 'success' })],
+			busy: false,
+			status: ''
+		});
+		assert.ok(!log.findAll('span').some(node => node.className.split(' ').includes('badge')));
+		assert.ok(!log.findAll('details').some(d => d.className === 'summary-details'));
+		assert.ok(!log.children.some(node => node.className === 'msg summary'));
+		const everything = log.findAll('span').map(n => n.textContent)
+			.concat(log.findAll('div').map(n => n.textContent), log.findAll('summary').map(n => n.textContent));
+		assert.ok(!everything.some(text => text.includes('Zusammenfassung: erfolgreich')));
+		assert.strictEqual(everything.filter(text => text === 'erfolgreich').length, 0);
+		assert.strictEqual(everything.filter(text => /^1 erfolgreich/.test(text)).length, 0);
+	});
+
+	test('Ergebniskarte: Badge nur bei abweichendem Ausgang, Fallback auf Problemzähler', () => {
 		const { log, sendState } = renderWebview(getChatHtml('badges'), async () => {});
 		const activities = [
 			describeActivity({ step: 1, tool: 'read_file', target: 'a.ts', status: 'success' }),
@@ -1602,13 +1693,13 @@ suite('Bubble Chat', () => {
 			],
 			activities, busy: false, status: ''
 		});
-		assert.deepStrictEqual(badgeTexts(), ['teilweise', '1 erfolgreich', '1 Budget']);
+		assert.deepStrictEqual(badgeTexts(), ['teilweise']);
 
 		sendState({
 			entries: [{ kind: 'user', text: 'Frage' }, { kind: 'answer', text: 'Antwort' }],
 			activities, busy: false, status: ''
 		});
-		assert.deepStrictEqual(badgeTexts(), ['1 erfolgreich', '1 Budget']);
+		assert.deepStrictEqual(badgeTexts(), ['1 Budget']);
 
 		sendState({
 			entries: [{ kind: 'user', text: 'Frage' }, { kind: 'answer', text: 'Antwort' }],
@@ -1617,13 +1708,14 @@ suite('Bubble Chat', () => {
 		assert.deepStrictEqual(badgeTexts(), []);
 	});
 
-	test('Zusammenfassung ist einklappbar, kopierbar und bleibt beim Neuzeichnen offen', async () => {
+	test('Zusammenfassung bleibt als "Details" nur mit zusätzlichen Punkten, einklappbar und kopierbar', async () => {
 		const copied: string[] = [];
 		const { log, sendState } = renderWebview(
 			getChatHtml('summary-details'),
 			async text => { copied.push(text); }
 		);
-		const text = 'Zusammenfassung: erfolgreich\nAusgeführt (1):\n- Datei gelesen: a.ts';
+		const text = 'Zusammenfassung: teilweise\nAusgeführt (1):\n- Datei gelesen: a.ts\n'
+			+ 'Nicht ausgeführt oder abgewiesen (1):\n- Datei wegen Budget nicht übernommen: b.ts';
 		const state = {
 			entries: [
 				{ kind: 'user', text: 'Frage' },
@@ -1637,7 +1729,11 @@ suite('Bubble Chat', () => {
 		const details = log.findAll('details').filter(d => d.className === 'summary-details');
 		assert.strictEqual(details.length, 1);
 		assert.strictEqual(details[0].open, false);
-		assert.strictEqual(details[0].findAll('summary')[0].textContent, 'Zusammenfassung: erfolgreich');
+		assert.strictEqual(details[0].findAll('summary')[0].textContent, 'Details');
+		// Der Ausgang steht nicht noch einmal im Inhalt.
+		const body = details[0].findAll('div').find(node => node.className === 'body')!;
+		assert.ok(!body.textContent.includes('Zusammenfassung:'));
+		assert.ok(body.textContent.includes('Nicht ausgeführt oder abgewiesen (1):'));
 
 		details[0].open = true;
 		sendState(state);
@@ -1648,15 +1744,33 @@ suite('Bubble Chat', () => {
 		assert.strictEqual(button.getAttribute('aria-label'), 'Zusammenfassung kopieren');
 		await button.listeners.get('click')?.();
 		assert.deepStrictEqual(copied, [text]);
+
+		// Zusätzlicher offener Punkt bei Erfolg: Details bleiben.
+		sendState({
+			entries: [
+				{ kind: 'user', text: 'Frage' },
+				{ kind: 'summary', text: 'Zusammenfassung: erfolgreich\nOffen:\n- Wiederholte Aufrufe wurden beendet.' }
+			],
+			busy: false,
+			status: ''
+		});
+		assert.strictEqual(
+			log.findAll('details').filter(d => d.className === 'summary-details').length,
+			1
+		);
 	});
 
-	test('Webview-CSS: Timeline, Statusfarben und schmale Breiten', () => {
+	test('Webview-CSS: verbundener Block, Statussymbole und schmale Breiten', () => {
 		const html = getChatHtml('timeline-css');
 		assert.ok(html.includes('.activity ol { list-style: none;'));
-		assert.ok(html.includes('.activity li.failed::before'));
+		assert.ok(html.includes('.activity li.failed .activity-symbol'));
 		assert.ok(html.includes('text-overflow: ellipsis'));
-		assert.ok(html.includes('@media (max-width: 340px) { .activity .activity-status { display: none; } }'));
-		assert.ok(html.includes('@media (max-width: 220px) { .activity .activity-counts { display: none; } }'));
+		assert.ok(html.includes('.msg.user + .activity'));
+		assert.ok(html.includes('.activity details[open] ~ .activity-note { display: none; }'));
+		assert.ok(html.includes('@media (max-width: 340px)'));
+		assert.ok(html.includes('@media (max-width: 220px)'));
+		assert.ok(!html.includes('.activity-status'));
+		assert.ok(!html.includes('.activity li::before'));
 	});
 
 	test('Leseaktivität stellt Werkzeugdaten ausschließlich als Text dar', () => {

@@ -465,23 +465,31 @@ details.summary-details .body { white-space: pre-wrap; overflow-wrap: anywhere; 
 details.tools summary { cursor: pointer; padding: 2px 34px 2px 0; }
 details.tools pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family, monospace); padding: 6px 8px; border-radius: 4px; background: var(--vscode-textCodeBlock-background); }
 .activity { position: relative; padding: 8px 10px; border: 1px solid var(--vscode-panel-border, transparent); border-radius: 6px; background: var(--vscode-editorWidget-background, transparent); }
-.activity h2 { margin: 0 0 2px; padding-right: 34px; font-size: 0.95em; }
-.activity .activity-summary, .activity .activity-counts { margin: 0 0 4px; color: var(--vscode-descriptionForeground); font-size: 0.9em; overflow-wrap: anywhere; }
-.activity ol { list-style: none; margin: 6px 0 0; padding: 0 0 0 8px; border-left: 2px solid var(--vscode-panel-border, currentColor); }
-.activity li { position: relative; padding: 1px 0 1px 10px; margin: 0; overflow-wrap: anywhere; }
-.activity li::before { content: ''; position: absolute; left: -13px; top: 0.7em; width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); }
+.activity .activity-summary { margin: 0; color: var(--vscode-descriptionForeground); font-size: 0.9em; overflow-wrap: anywhere; }
+.activity .activity-head { margin: 0 0 4px; padding-right: 34px; font-size: 0.95em; font-weight: 600; }
+.activity ol { list-style: none; margin: 0; padding: 0; }
+.activity li { position: relative; padding: 1px 0; margin: 0; overflow-wrap: anywhere; }
 .activity li.running { font-weight: 600; }
-.activity li.running::before { background: var(--vscode-progressBar-background, var(--vscode-focusBorder)); }
-.activity li.success::before { background: var(--vscode-charts-green, var(--vscode-descriptionForeground)); }
-.activity li.budget-rejected::before, .activity li.repeat-blocked::before { background: var(--vscode-editorWarning-foreground); }
-.activity li.failed::before { background: var(--vscode-errorForeground); }
+.activity .activity-symbol { color: var(--vscode-descriptionForeground); }
+.activity li.running .activity-symbol { color: var(--vscode-progressBar-background, var(--vscode-focusBorder)); }
+.activity li.success .activity-symbol { color: var(--vscode-charts-green, var(--vscode-descriptionForeground)); }
+.activity li.budget-rejected .activity-symbol, .activity li.repeat-blocked .activity-symbol { color: var(--vscode-editorWarning-foreground); }
+.activity li.failed .activity-symbol { color: var(--vscode-errorForeground); }
+.activity .activity-note { padding-left: 1.7em; font-size: 0.9em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+.activity details[open] ~ .activity-note { display: none; }
+.activity .activity-block-title { margin-top: 4px; padding-left: 1.4em; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--vscode-descriptionForeground); }
+details.activity-tech, details.activity-run-tech { margin: 4px 0 0 1.4em; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
+.activity details.activity-run-tech { margin: 6px 0 0; }
+.msg.user + .activity, .activity + .msg.answer, .msg.user + .msg.answer, .msg.answer + details.summary-details { margin-top: -6px; }
+.msg.user + .activity, .activity + .msg.answer, .msg.user + .msg.answer { border-top-left-radius: 0; border-top-right-radius: 0; }
+.msg.user:has(+ .activity), .msg.user:has(+ .msg.answer) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#log > * + .msg.user { margin-top: 10px; }
 .activity summary { display: flex; align-items: baseline; gap: 6px; min-width: 0; cursor: pointer; }
 .activity summary::after { content: '›'; flex: none; margin-left: auto; color: var(--vscode-descriptionForeground); }
 .activity details[open] > summary::after { transform: rotate(90deg); }
 .activity .activity-symbol { flex: none; width: 1.1em; text-align: center; }
 .activity .activity-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .activity details[open] > summary .activity-title { white-space: normal; overflow-wrap: anywhere; }
-.activity .activity-status { flex: none; padding: 0 5px; border-radius: 8px; font-size: 0.75em; font-weight: 400; border: 1px solid var(--vscode-panel-border, currentColor); white-space: nowrap; color: var(--vscode-descriptionForeground); }
 .activity .activity-meta { margin-top: 2px; padding-left: 1.4em; color: var(--vscode-descriptionForeground); font-size: 0.9em; font-weight: 400; }
 .activity .activity-error { color: var(--vscode-errorForeground); }
 #working { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--vscode-focusBorder); background: var(--vscode-editorWidget-background, transparent); }
@@ -505,8 +513,6 @@ button.secondary:hover:not(:disabled) { background: var(--vscode-button-secondar
 button:disabled { opacity: 0.5; cursor: default; }
 .keys { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
 @media (max-width: 340px) { .row { grid-template-columns: minmax(0, 1fr); } .row #send { grid-column: auto; } }
-@media (max-width: 340px) { .activity .activity-status { display: none; } }
-@media (max-width: 220px) { .activity .activity-counts { display: none; } }
 @media (max-width: 220px) { #composer { padding-right: 6px; padding-left: 6px; } .row button { padding-right: 4px; padding-left: 4px; font-size: 0.78em; } }
 </style>
 </head>
@@ -598,43 +604,111 @@ function addCopyButton(msg, text, label) {
 }
 const ACTIVITY_SYMBOLS = { running: '…', success: '✓', failed: '✗', 'budget-rejected': '!', 'repeat-blocked': '↷' };
 const OUTCOME_CLASSES = { erfolgreich: 'ok', teilweise: 'partial', abgebrochen: 'partial', fehlgeschlagen: 'failed' };
-const COUNT_PARTS = [
-  ['success', 'ok', 'erfolgreich'],
-  ['running', 'running', 'läuft'],
-  ['budget-rejected', 'budget', 'Budget'],
-  ['repeat-blocked', 'skipped', 'übersprungen'],
-  ['failed', 'failed', 'fehlgeschlagen']
-];
-// Zähler ausschließlich aus den beobachteten Aktivitäten.
-function countParts(activities) {
-  const parts = [];
-  for (const [status, className, label] of COUNT_PARTS) {
-    const count = activities.filter(activity => activity.status === status).length;
-    if (count > 0) { parts.push({ className, text: count + ' ' + label }); }
+const NO_READ_NOTE = 'Es wurde keine Datei oder kein Dateibereich gelesen.';
+// Kurze Werkzeugaktion: [erfolgreich, läuft, fehlgeschlagen, nicht übernommen].
+const TOOL_VERBS = {
+  read_file: ['Datei gelesen', 'Datei wird gelesen', 'Datei nicht gelesen', 'Datei nicht übernommen'],
+  read_file_range: ['Bereich gelesen', 'Bereich wird gelesen', 'Bereich nicht gelesen', 'Bereich nicht übernommen'],
+  list_directory: ['Ordner aufgelistet', 'Ordner wird aufgelistet', 'Ordner nicht aufgelistet', 'Ordnerliste nicht übernommen'],
+  search_text: ['Suche', 'Suche läuft', 'Suche fehlgeschlagen', 'Suche nicht übernommen']
+};
+const DEFAULT_VERBS = ['Werkzeug ausgeführt', 'Werkzeug läuft', 'Werkzeug nicht ausgeführt', 'Werkzeug nicht übernommen'];
+const PROJECT_WIDE = ' in **/*';
+const INPUT_PREFIXES = ['Werkzeug:', 'Angefordert:'];
+const OUTPUT_PREFIXES = ['Status:', 'Geliefert:', 'Grund:'];
+function startsWithAny(line, prefixes) { return prefixes.some(prefix => line.startsWith(prefix)); }
+function baseName(path) {
+  const parts = String(path).split(/[\\\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : String(path);
+}
+function rangeText(range) {
+  return range.firstLine === range.lastLine
+    ? 'Zeile ' + range.firstLine
+    : 'Zeilen ' + range.firstLine + '–' + range.lastLine;
+}
+function activityTarget(activity) {
+  const target = String(activity.target || '');
+  if (activity.tool === 'read_file' || activity.tool === 'read_file_range') { return baseName(target); }
+  if (activity.tool === 'search_text') {
+    const what = target.endsWith(PROJECT_WIDE) ? target.slice(0, -PROJECT_WIDE.length) : target;
+    return what.replace(/^"(.*)"$/, '„$1“');
   }
-  return parts;
+  return target;
+}
+// Wichtiges Ergebnis nur aus vorhandenen Feldern; nichts wird erfunden.
+function activityResult(activity) {
+  if (activity.status === 'budget-rejected') { return 'Budget'; }
+  if (activity.status === 'repeat-blocked') { return 'übersprungen'; }
+  if (activity.status === 'failed') { return ''; }
+  if (activity.tool === 'read_file_range') {
+    if (activity.status === 'success' && activity.deliveredRange === null) { return 'keine Zeilen'; }
+    const range = activity.deliveredRange || activity.requestedRange;
+    return range ? rangeText(range) : '';
+  }
+  return '';
+}
+function activityRowText(activity) {
+  const verbs = TOOL_VERBS[activity.tool] || DEFAULT_VERBS;
+  const verb = activity.status === 'success' ? verbs[0]
+    : activity.status === 'running' ? verbs[1]
+    : activity.status === 'failed' ? verbs[2]
+    : verbs[3];
+  const target = activityTarget(activity);
+  const head = activity.tool === 'search_text' ? [verb + ' ' + target] : [verb, target];
+  return head.concat([activityResult(activity)]).filter(Boolean).join(' · ');
+}
+function runHeadText(activities) {
+  const count = status => activities.filter(activity => activity.status === status).length;
+  const parts = [activities.length + (activities.length === 1 ? ' Schritt' : ' Schritte')];
+  const problems = [['budget-rejected', 'Budget'], ['repeat-blocked', 'übersprungen'], ['failed', 'fehlgeschlagen']]
+    .filter(entry => count(entry[0]) > 0)
+    .map(entry => count(entry[0]) + ' ' + entry[1]);
+  if (count('running') > 0) { parts.push('läuft'); }
+  if (problems.length > 0) {
+    if (count('success') > 0) { parts.push(count('success') + ' erfolgreich'); }
+    parts.push(...problems);
+  } else if (count('running') === 0) {
+    parts.push('abgeschlossen');
+  }
+  return parts.join(' · ');
 }
 // Ausgang nur aus der ersten Zeile der Zusammenfassung; sonst keiner.
 function outcomeFromSummary(text) {
   const match = /^Zusammenfassung: (.+)$/m.exec(String(text || ''));
   return match ? match[1].trim() : '';
 }
+// Die Zusammenfassung bleibt nur sichtbar, wenn sie mehr als den schon
+// sichtbaren Ausgang enthält (Warnungen, offene Punkte, abgewiesene Aufrufe).
+function summaryAddsInfo(text) {
+  const outcome = outcomeFromSummary(text);
+  if (!outcome || outcome !== 'erfolgreich') { return true; }
+  const lines = String(text).split('\\n');
+  if (lines.some(line => line.startsWith('Nicht ausgeführt oder abgewiesen'))) { return true; }
+  const openAt = lines.indexOf('Offen:');
+  return openAt >= 0 && lines.slice(openAt + 1).some(line => line.startsWith('- ') && line !== '- ' + NO_READ_NOTE);
+}
+// Badges nur mit zusätzlichem Nutzen: abweichender Ausgang bzw. Problemarten.
 function renderBadges(activities, summaryText) {
-  const row = el('div', 'result-badges');
   const outcome = outcomeFromSummary(summaryText);
-  if (outcome) {
-    row.appendChild(el('span', 'badge outcome ' + (OUTCOME_CLASSES[outcome] || ''), outcome));
+  const chips = [];
+  if (outcome && outcome !== 'erfolgreich') {
+    chips.push(['outcome ' + (OUTCOME_CLASSES[outcome] || ''), outcome]);
+  } else if (!outcome) {
+    for (const [status, className, label] of [['budget-rejected', 'budget', 'Budget'], ['repeat-blocked', 'skipped', 'übersprungen'], ['failed', 'failed', 'fehlgeschlagen']]) {
+      const count = activities.filter(activity => activity.status === status).length;
+      if (count > 0) { chips.push([className, count + ' ' + label]); }
+    }
   }
-  for (const part of countParts(activities)) {
-    row.appendChild(el('span', 'badge ' + part.className, part.text));
-  }
+  if (chips.length === 0) { return null; }
+  const row = el('div', 'result-badges');
+  for (const [className, text] of chips) { row.appendChild(el('span', 'badge ' + className, text)); }
   return row;
 }
-function renderActivities(activities, openSteps) {
+function renderActivities(activities, openState) {
   if (!activities || activities.length === 0) { return; }
   const section = el('section', 'activity');
   section.setAttribute('aria-label', 'Aktivitätsverlauf');
-  section.appendChild(el('h2', '', 'Aktivitätsverlauf'));
+  section.appendChild(el('h2', 'activity-head', runHeadText(activities)));
   const copyText = activities.map((activity, index) => {
     const lines = [(index + 1) + '. ' + (activity.title || (activity.tool + ' ' + activity.target))];
     for (const detail of Array.isArray(activity.details) ? activity.details : []) {
@@ -646,6 +720,50 @@ function renderActivities(activities, openSteps) {
     return lines.join('\\n');
   }).join('\\n\\n');
   addCopyButton(section, copyText, 'Aktivitätsverlauf');
+  const list = el('ol');
+  for (const activity of activities) {
+    const item = el('li', activity.status);
+    const details = el('details', 'activity-step');
+    details.setAttribute('data-step', String(activity.step));
+    details.open = openState.steps.has(String(activity.step));
+    const summary = el('summary');
+    const symbol = el('span', 'activity-symbol', ACTIVITY_SYMBOLS[activity.status] || '?');
+    symbol.setAttribute('role', 'img');
+    symbol.setAttribute('aria-label', activity.statusLabel || activity.status);
+    summary.appendChild(symbol);
+    const titleSpan = el('span', 'activity-title', activityRowText(activity));
+    titleSpan.setAttribute('title', activity.title || (activity.tool + ' ' + activity.target));
+    summary.appendChild(titleSpan);
+    details.appendChild(summary);
+    const lines = Array.isArray(activity.details) ? activity.details : [];
+    const inputLines = ['Ziel: ' + activity.target].concat(lines.filter(line => startsWithAny(line, INPUT_PREFIXES)));
+    const outputLines = lines.filter(line => startsWithAny(line, OUTPUT_PREFIXES));
+    if (activity.reason && !lines.includes('Grund: ' + activity.reason)) {
+      outputLines.push('Grund: ' + activity.reason);
+    }
+    const techLines = lines.filter(line => !startsWithAny(line, INPUT_PREFIXES) && !startsWithAny(line, OUTPUT_PREFIXES));
+    details.appendChild(el('div', 'activity-block-title', 'Eingabe'));
+    for (const line of inputLines) { details.appendChild(el('div', 'activity-meta', line)); }
+    if (outputLines.length > 0) {
+      details.appendChild(el('div', 'activity-block-title', 'Ausgabe'));
+      for (const line of outputLines) { details.appendChild(el('div', 'activity-meta', line)); }
+    }
+    if (techLines.length > 0) {
+      const tech = el('details', 'activity-tech');
+      tech.setAttribute('data-tech-step', String(activity.step));
+      tech.open = openState.tech.has(String(activity.step));
+      tech.appendChild(el('summary', '', 'Technik'));
+      for (const line of techLines) { tech.appendChild(el('div', 'activity-meta', line)); }
+      details.appendChild(tech);
+    }
+    item.appendChild(details);
+    // Warnungen und Fehler bleiben auch zugeklappt sichtbar.
+    if (activity.status !== 'success' && activity.status !== 'running' && activity.reason) {
+      item.appendChild(el('div', 'activity-note' + (activity.status === 'failed' ? ' activity-error' : ''), activity.reason));
+    }
+    list.appendChild(item);
+  }
+  section.appendChild(list);
   let usedRound = 0;
   let maxRounds = 0;
   for (const activity of activities) {
@@ -653,38 +771,13 @@ function renderActivities(activities, openSteps) {
     if (Number.isFinite(activity.maxRounds)) { maxRounds = activity.maxRounds; }
   }
   if (usedRound > 0 && maxRounds > 0) {
-    const rounds = el('div', 'activity-summary', 'Modellschritte: ' + usedRound + ' von ' + maxRounds);
-    rounds.setAttribute('title', 'Nur Modellschritte zählen zum Limit, nicht einzelne Aufrufe.');
-    section.appendChild(rounds);
+    const runTech = el('details', 'activity-run-tech');
+    runTech.open = openState.runTech;
+    runTech.appendChild(el('summary', '', 'Technische Details'));
+    runTech.appendChild(el('div', 'activity-summary', 'Modellschritte: ' + usedRound + ' von ' + maxRounds));
+    runTech.appendChild(el('div', 'activity-meta', 'Nur Modellschritte zählen zum Limit, nicht einzelne Aufrufe.'));
+    section.appendChild(runTech);
   }
-  section.appendChild(el('div', 'activity-counts', activities.length + (activities.length === 1 ? ' Aufruf' : ' Aufrufe') + ' · ' + countParts(activities).map(part => part.text).join(' · ')));
-  const list = el('ol');
-  for (const activity of activities) {
-    const item = el('li', activity.status);
-    const details = el('details', 'activity-step');
-    details.setAttribute('data-step', String(activity.step));
-    details.open = openSteps.has(String(activity.step));
-    const summary = el('summary');
-    const symbol = el('span', 'activity-symbol', ACTIVITY_SYMBOLS[activity.status] || '?');
-    symbol.setAttribute('aria-hidden', 'true');
-    summary.appendChild(symbol);
-    const fullTitle = activity.title || (activity.tool + ' ' + activity.target);
-    const titleSpan = el('span', 'activity-title', fullTitle);
-    titleSpan.setAttribute('title', fullTitle);
-    summary.appendChild(titleSpan);
-    summary.appendChild(el('span', 'activity-status', activity.statusLabel || activity.status));
-    details.appendChild(summary);
-    const lines = Array.isArray(activity.details) ? activity.details : [];
-    for (const line of lines) {
-      details.appendChild(el('div', 'activity-meta', line));
-    }
-    if (activity.reason && !lines.includes('Grund: ' + activity.reason)) {
-      details.appendChild(el('div', 'activity-meta activity-error', activity.reason));
-    }
-    item.appendChild(details);
-    list.appendChild(item);
-  }
-  section.appendChild(list);
   log.appendChild(section);
 }
 function render(state) {
@@ -692,8 +785,10 @@ function render(state) {
   log.querySelectorAll('details.tools').forEach((d, i) => { if (d.open) { openTools.add(i); } });
   const openSummaries = new Set();
   log.querySelectorAll('details.summary-details').forEach((d, i) => { if (d.open) { openSummaries.add(i); } });
-  const openSteps = new Set();
-  log.querySelectorAll('details.activity-step').forEach(d => { if (d.open) { openSteps.add(d.getAttribute('data-step')); } });
+  const openState = { steps: new Set(), tech: new Set(), runTech: false };
+  log.querySelectorAll('details.activity-step').forEach(d => { if (d.open) { openState.steps.add(d.getAttribute('data-step')); } });
+  log.querySelectorAll('details.activity-tech').forEach(d => { if (d.open) { openState.tech.add(d.getAttribute('data-tech-step')); } });
+  log.querySelectorAll('details.activity-run-tech').forEach(d => { if (d.open) { openState.runTech = true; } });
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.textContent = '';
   if (state.entries.length === 0 && !state.busy) {
@@ -712,7 +807,7 @@ function render(state) {
   const lastSummary = state.entries.find((entry, index) => entry.kind === 'summary' && index > lastUser);
   state.entries.forEach((e, index) => {
     renderEntry(e, hasActivities && index === lastAnswer && index > lastUser);
-    if (hasActivities && index === lastUser) { renderActivities(state.activities, openSteps); }
+    if (hasActivities && index === lastUser) { renderActivities(state.activities, openState); }
   });
   function renderEntry(e, withBadges) {
     if (e.kind === 'evidence') {
@@ -726,18 +821,21 @@ function render(state) {
       return;
     }
     if (e.kind === 'summary') {
+      // Wiederholt die Zusammenfassung nur den sichtbaren Ausgang, entfällt sie.
+      if (!summaryAddsInfo(e.text)) { return; }
       const details = el('details', 'summary-details');
       details.open = openSummaries.has(summaryIndex);
       summaryIndex += 1;
-      details.appendChild(el('summary', '', String(e.text).split('\\n')[0]));
-      details.appendChild(el('div', 'body', e.text));
+      details.appendChild(el('summary', '', 'Details'));
+      details.appendChild(el('div', 'body', String(e.text).split('\\n').slice(1).join('\\n')));
       addCopyButton(details, e.text, COPY_LABELS.summary);
       log.appendChild(details);
       return;
     }
     const msg = el('section', 'msg ' + e.kind);
     msg.appendChild(el('div', 'who', LABELS[e.kind] || ''));
-    if (withBadges) { msg.appendChild(renderBadges(state.activities, lastSummary && lastSummary.text)); }
+    const badges = withBadges ? renderBadges(state.activities, lastSummary && lastSummary.text) : null;
+    if (badges) { msg.appendChild(badges); }
     msg.appendChild(el('div', 'body', e.text));
     if (COPY_LABELS[e.kind]) {
       addCopyButton(
@@ -748,7 +846,7 @@ function render(state) {
     }
     log.appendChild(msg);
   }
-  if (hasActivities && lastUser < 0) { renderActivities(state.activities, openSteps); }
+  if (hasActivities && lastUser < 0) { renderActivities(state.activities, openState); }
   if (state.busy) {
     const working = el('div', '');
     working.id = 'working';
