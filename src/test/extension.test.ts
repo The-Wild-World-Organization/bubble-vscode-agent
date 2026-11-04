@@ -1784,7 +1784,9 @@ suite('Extension Test Suite', () => {
 		}
 	});
 
-	test('Simulierte Freigabe: ungespeicherte Änderung der Zieldatei verhindert die Freigabe, andere ungespeicherte Dateien nicht', async () => {
+	test('Simulierte Freigabe: ungespeicherte Änderung der Zieldatei verhindert die Freigabe, andere ungespeicherte Dateien nicht', async function () {
+		// Öffnet echte Diff-Editoren; auf CI-Runnern dauert das länger als Mochas Standard von 2 s.
+		this.timeout(15000);
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bubble-dirty-sim-'));
 		fs.writeFileSync(path.join(dir, 'a.txt'), 'alt\n');
 		fs.writeFileSync(path.join(dir, 'b.txt'), 'andere\n');
@@ -1864,7 +1866,9 @@ suite('Extension Test Suite', () => {
 		}
 	});
 
-	test('Simulierte Freigabe: Zustimmung, Ablehnung, Abbruch, geschlossener Diff und geänderter Vorschlag schreiben nie', async () => {
+	test('Simulierte Freigabe: Zustimmung, Ablehnung, Abbruch, geschlossener Diff und geänderter Vorschlag schreiben nie', async function () {
+		// Öffnet echte Diff-Editoren; auf CI-Runnern dauert das länger als Mochas Standard von 2 s.
+		this.timeout(15000);
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bubble-sim-'));
 		fs.writeFileSync(path.join(dir, 'a.txt'), 'alt\n');
 		const wsUri = vscode.Uri.file(dir);
@@ -1951,7 +1955,9 @@ suite('Extension Test Suite', () => {
 		}
 	});
 
-	test('Simulierte Freigabe über den Befehl: Meldung nur bei Zustimmung, Datei unverändert', async () => {
+	test('Simulierte Freigabe über den Befehl: Meldung nur bei Zustimmung, Datei unverändert', async function () {
+		// Öffnet echte Diff-Editoren; auf CI-Runnern dauert das länger als Mochas Standard von 2 s.
+		this.timeout(15000);
 		const extension = vscode.extensions.getExtension('undefined_publisher.bubble-vscode-agent');
 		assert.ok(extension);
 		await extension.activate();
