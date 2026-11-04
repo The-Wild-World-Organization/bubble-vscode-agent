@@ -9,8 +9,11 @@ on:
       - main
 
 jobs:
+  # Gehostete Runner sind in der Org aus. Beide Jobs laufen auf dem eigenen
+  # Windows-Runner BUBBLE-WIN (Heimserver), Einrichtung siehe docs/RUNNER.md.
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, windows, bubble-win]
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -29,7 +32,8 @@ jobs:
         run: npm run package
 
   test:
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, bubble-win]
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
